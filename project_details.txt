@@ -1,0 +1,57 @@
+Tools / Libraries Used:
+------------------------
+• Node.js with Express.js - for handling server requests and routing
+• Multer - for parsing multipart/form-data to handle image uploads
+• OpenAI API (DALL·E) - for generating outfit-stylized images
+• Tailwind CSS - for responsive and aesthetic frontend styling
+• JavaScript (Vanilla) - for frontend logic including rendering and upload
+
+How Outfit Consistency Was Ensured:
+-----------------------------------
+-->Before sending the promt to the DALL·E 3 we can extract the image information and based on the information extracted we can give a promt like this:`Create a high-resolution fashion image styled on an invisible mannequin with a clean, light-colored background.
+        The centerpiece outfit is: ${outfitDescription}.
+        Style it specifically for a ${style} context by adding appropriate ${style === "Office" ? "professional accessories like blazers, loafers, and structured bags" : style === "Party" ? "glamorous accessories like jewelry, heels, and clutches" : "vacation accessories like sun hats, sandals, and sunglasses"}.
+        Maintain the outfit’s original shape, layout, and proportions. Ensure studio-quality, editorial lighting and composition.`
+
+• Prompt references a specific "vacation outfit" image to keep styling/layout consistent across all generations
+
+Sample Prompt:
+--------------
+"Analyze the uploaded clothing image to identify the type of garment (e.g., shirt, jacket, pants). Then, generate a stylish and complete outfit suitable for the {style} context, with the uploaded item as the centerpiece. Display the outfit on an invisible mannequin with a clean, light-colored background in a high-resolution product photography style. Use the layout and style of the last user-uploaded vacation outfit as reference. Include matching bottoms or tops, shoes, and accessories."
+
+Code for Automation:
+---------------------
+• Upload handler using multer to allow multiple image uploads
+• For each uploaded image:
+   1. The image is encoded to base64
+   2. A prompt is dynamically constructed using the style context
+   3. The prompt and image are sent to the OpenAI API (via `openai.images.generate`)
+   4. The resulting image URLs are returned and rendered on the frontend
+
+Key Backend Code Flow:
+-----------------------
+// Image upload and processing
+app.post("/process", upload.array("images"), async (req, res) => {
+  const styles = ["office", "party", "vacation"];
+  const stylizedSets = [];
+
+  for (const file of req.files) {
+    const original = `data:image/png;base64,${file.buffer.toString("base64")}`;
+    const set = { original };
+
+    for (const style of styles) {
+      const prompt = `Analyze the uploaded clothing image and generate a complete ${style} outfit...`; // shortened here
+      const response = await openai.images.generate({
+        prompt,
+        n: 1,
+        size: "1024x1024",
+      });
+      set[style] = response.data[0].url;
+    }
+
+    stylizedSets.push(set);
+  }
+
+  res.json({ stylizedSets });
+});
+
